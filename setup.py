@@ -21,13 +21,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import imp
-import io
+import importlib.util
 import os
+import sys
+
 from setuptools import setup, find_packages
 
-version = imp.load_source(
-    'databricks_cli.version', os.path.join('databricks_cli', 'version.py')).version
+# Get version
+# https://docs.python.org/3/library/importlib.html#importing-a-source-file-directly
+# We do this because this is executed before it is installed
+module_name = "databricks_cli.version"
+spec = importlib.util.spec_from_file_location(
+    module_name, os.path.join('databricks_cli', 'version.py')
+)
+
+if spec is None:
+    raise ValueError('Install failed, could not fild databricks_cli.version module.')
+
+databricks_cli_version = importlib.util.module_from_spec(spec)
+sys.modules[module_name] = databricks_cli_version
+spec.loader.exec_module(databricks_cli_version)
+version = databricks_cli_version.version
+
+# Prevent open file handles leaking
+with open('README.rst', encoding='utf-8') as f:
+    long_description = f.read()
+
 
 setup(
     name='databricks-cli',
@@ -42,7 +61,7 @@ setup(
         'tabulate>=0.7.7',
         'six>=1.10.0',
         'configparser>=0.3.5;python_version < "3.6"',
-        'urllib3>=1.26.7,<2.0.0'
+        'urllib3>=1.26.7,<2.0.0',
     ],
     entry_points='''
         [console_scripts]
@@ -53,7 +72,7 @@ setup(
     author='Andrew Chen',
     author_email='andrewchen@databricks.com',
     description='A command line interface for Databricks',
-    long_description=io.open('README.rst', encoding='utf-8').read(),
+    long_description=long_description,
     license='Apache License 2.0',
     classifiers=[
         'Intended Audience :: Developers',
@@ -63,5 +82,6 @@ setup(
         'License :: OSI Approved :: Apache Software License',
     ],
     keywords='databricks cli',
-    url='https://github.com/databricks/databricks-cli'
+    url='https://github.com/databricks/databricks-cli',
+    options={'bdist_wheel': {'universal': True}},
 )
